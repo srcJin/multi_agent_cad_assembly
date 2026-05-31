@@ -1,6 +1,7 @@
 import { useStore, type TabId } from "./lib/store";
 import { PromptPanel } from "./components/PromptPanel";
 import { DrawingView } from "./tabs/DrawingView";
+import { SimulationView } from "./tabs/SimulationView";
 
 const TABS: TabId[] = ["drawing", "simulation", "orchestration", "timeline", "validation", "state"];
 
@@ -15,7 +16,11 @@ export default function App() {
         </nav>
         <section style={{ flex: 1, overflow: "auto", padding: 12 }}>
           {assembly ? (
-            activeTab === "drawing" ? <DrawingView /> : <div data-testid="active-tab">{activeTab} view</div>
+            <>
+              {activeTab === "drawing" && <DrawingView />}
+              {activeTab === "simulation" && <SimulationView />}
+              {!["drawing", "simulation"].includes(activeTab) && <div data-testid="active-tab">{activeTab} view</div>}
+            </>
           ) : <p>Run a workflow to begin.</p>}
         </section>
       </main>
