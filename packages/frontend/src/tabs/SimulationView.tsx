@@ -1,84 +1,147 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "../lib/store";
 import { buildWorld, type WorldHandle } from "../simulation/planckWorld";
+import type { AssemblyState, Point } from "@cad/shared";
+
+const W = 680;
+const H = 460;
 
 export function SimulationView() {
-  const { assembly } = useStore();
+  const { assembly, playing, setPlaying } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<WorldHandle | null>(null);
   const rafRef = useRef<number | null>(null);
-  const assemblyRef = useRef(assembly);
-  const [playing, setPlaying] = useState(false);
+  const assemblyRef = useRef<AssemblyState | null>(assembly);
 
-  useEffect(() => {
-    assemblyRef.current = assembly;
-  }, [assembly]);
+  useEffect(() => { assemblyRef.current = assembly; }, [assembly]);
+
+  // Visual rotation: gearA from physics; gearB derived (counter-rotates per ratio)
+  // so meshing reads correctly even though only gearA is motorized.
+  const renderAngle = (id: string): number => {
+    const handle = handleRef.current, a = assemblyRef.current;
+    if (!handle || !a) return 0;
+    if (id === "gearB") {
+      const angA = handle.bodies.gearA?.getAngle() ?? 0;
+      const rA = a.parts.find((p) => p.id === "gearA")?.simulation.radius ?? 1;
+      const rB = a.parts.find((p) => p.id === "gearB")?.simulation.radius ?? 1;
+      return -angA * (rA / rB);
+    }
+    return handle.bodies[id]?.getAngle() ?? 0;
+  };
 
   const draw = () => {
-    const canvas = canvasRef.current, handle = handleRef.current;
-    const a = assemblyRef.current;
-    if (!canvas || !handle || !a) return;
+    const canvas = canvasRef.current, a = assemblyRef.current;
+    if (!canvas || !a) return;
     const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, W, H);
+
+    const [bw, bh] = a.layout?.boxSize ?? [200, 200];
+    const scale = Math.min(W / (bw * 1.25), H / (bh * 1.25));
+
     ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.scale(2, -2);
-    for (const [id, body] of Object.entries(handle.bodies)) {
-      const pos = body.getPosition(), angle = body.getAngle();
-      const r = (a.parts as any[]).find((p) => p.id === id)?.simulation?.radius ?? 2;
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-      ctx.rotate(angle);
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(scale, -scale); // model +y up
+    ctx.lineJoin = "round";
+
+    const colorFor = (id: string, type: string) => {
+      if (id === "gearA") return "#6e8bff";
+      if (id === "gearB") return "#38d6c8";
+      if (type === "box") return "#3a4254";
+      if (type === "shaft") return "#d29922";
+      return "#586069";
+    };
+
+    const drawPoly = (pts: Point[], pivot: Point, angle: number, stroke: string, fill?: string) => {
+      const c = Math.cos(angle), s = Math.sin(angle);
       ctx.beginPath();
-      ctx.arc(0, 0, Math.max(1, r), 0, Math.PI * 2);
-      ctx.moveTo(0, 0);
-      ctx.lineTo(r, 0);
-      ctx.strokeStyle = id.startsWith("gear") ? "#3d6be0" : "#888";
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      ctx.restore();
+      pts.forEach(([x, y], i) => {
+        const dx = x - pivot[0], dy = y - pivot[1];
+        const rx = pivot[0] + dx * c - dy * s;
+        const ry = pivot[1] + dx * s + dy * c;
+        if (i === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
+      });
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      ctx.strokeStyle = stroke; ctx.lineWidth = 0.8; ctx.stroke();
+    };
+
+    // draw box & lid first (background), then shafts, then gears on top
+    const order = (t: string) => (t === "box" ? 0 : t === "lid" ? 1 : t === "shaft" ? 2 : 3);
+    const parts = [...a.parts].sort((p, q) => order(p.type) - order(q.type));
+
+    for (const part of parts) {
+      const outline = part.drawing?.outline;
+      if (!outline || outline.length < 2) continue;
+      const pivot = part.drawing.center as Point;
+      const angle = part.type === "gear" ? renderAngle(part.id) : 0;
+      const col = colorFor(part.id, part.type);
+      const fill = part.type === "gear"
+        ? (part.id === "gearA" ? "rgba(110,139,255,0.18)" : "rgba(56,214,200,0.18)")
+        : part.type === "shaft" ? "rgba(210,153,34,0.5)" : undefined;
+      drawPoly(outline, pivot, angle, col, fill);
+
+      // gear hub + spoke to show rotation
+      if (part.type === "gear") {
+        const r = part.simulation.radius;
+        const c = Math.cos(angle), s = Math.sin(angle);
+        ctx.beginPath();
+        ctx.moveTo(pivot[0], pivot[1]);
+        ctx.lineTo(pivot[0] + r * 0.7 * c, pivot[1] + r * 0.7 * s);
+        ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pivot[0], pivot[1], Math.max(1.2, r * 0.12), 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.fill();
+      }
     }
     ctx.restore();
   };
 
-  const step = () => {
-    handleRef.current?.world.step(1 / 60);
-    draw();
-  };
+  const step = () => { handleRef.current?.world.step(1 / 60); draw(); };
 
+  // rebuild world + redraw whenever the assembly changes
   useEffect(() => {
-    if (!playing) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      return;
-    }
-    const loop = () => {
-      step();
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [playing]);
-
-  useEffect(() => {
-    if (assembly) handleRef.current = buildWorld(assembly);
-    draw();
+    if (assembly) { handleRef.current = buildWorld(assembly); draw(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assembly]);
 
+  // animation loop driven by shared `playing` flag
+  useEffect(() => {
+    if (!playing) { if (rafRef.current) cancelAnimationFrame(rafRef.current); return; }
+    const loop = () => { step(); rafRef.current = requestAnimationFrame(loop); };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
+
   if (!assembly) return <p>No assembly.</p>;
+
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button onClick={() => setPlaying((p) => !p)}>{playing ? "Pause" : "Play"}</button>
-        <button onClick={step}>Step</button>
+    <div className="sim-wrap">
+      <div className="sim-toolbar">
+        <button
+          className={`btn btn-lg ${playing ? "" : "btn-accent"}`}
+          onClick={() => setPlaying(!playing)}
+        >
+          {playing ? "⏸ Pause" : "✦ Animate"}
+        </button>
+        <button className="btn" onClick={step} disabled={playing}>⏭ Step</button>
+        <span className="rpm">{playing ? "running · gearA motorized" : "paused"}</span>
+        <div className="sim-legend" style={{ marginLeft: "auto" }}>
+          <span className="item"><span className="sw" style={{ background: "#6e8bff" }} /> Gear A</span>
+          <span className="item"><span className="sw" style={{ background: "#38d6c8" }} /> Gear B</span>
+          <span className="item"><span className="sw" style={{ background: "#d29922" }} /> Shaft</span>
+          <span className="item"><span className="sw" style={{ background: "#3a4254" }} /> Box</span>
+        </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        width={500}
-        height={360}
-        style={{ background: "#fafafa", border: "1px solid #ddd" }}
-      />
+
+      <div className="sim-canvas-frame" style={{ width: W, height: H }}>
+        <canvas ref={canvasRef} width={W} height={H} />
+      </div>
+
+      <p className="sim-hint">
+        Abstract rigid-body view (Planck.js): gears are circles pinned to fixed shafts by revolute joints.
+        Gear A is motorized; Gear B counter-rotates by the gear ratio. This is the simulation projection of
+        the same Assembly State the Drawing view renders.
+      </p>
     </div>
   );
 }

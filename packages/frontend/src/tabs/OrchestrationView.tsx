@@ -27,8 +27,10 @@ export function OrchestrationView() {
   const { assembly } = useStore();
   if (!assembly) return <p>No assembly.</p>;
   return (
-    <div style={{ height: 460 }}>
-      <ReactFlow nodes={agentsToNodes(assembly.agents)} edges={pipelineEdges(assembly.agents)} fitView><Background /></ReactFlow>
+    <div className="orch-frame" style={{ height: "100%", minHeight: 460 }}>
+      <ReactFlow nodes={agentsToNodes(assembly.agents)} edges={pipelineEdges(assembly.agents)} fitView>
+        <Background color="#232b38" gap={18} />
+      </ReactFlow>
     </div>
   );
 }

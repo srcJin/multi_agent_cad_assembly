@@ -1,4 +1,5 @@
 import { useStore, type TabId } from "./lib/store";
+import { runWorkflow, repairOnce, resetProject } from "./lib/api";
 import { PromptPanel } from "./components/PromptPanel";
 import { StatusPanel } from "./components/StatusPanel";
 import { DrawingView } from "./tabs/DrawingView";
@@ -8,31 +9,129 @@ import { TimelineView } from "./tabs/TimelineView";
 import { ValidationView } from "./tabs/ValidationView";
 import { StateExportView } from "./tabs/StateExportView";
 
-const TABS: TabId[] = ["drawing", "simulation", "orchestration", "timeline", "validation", "state"];
+const TABS: { id: TabId; label: string }[] = [
+  { id: "drawing", label: "Drawing" },
+  { id: "simulation", label: "Simulation" },
+  { id: "orchestration", label: "Orchestration" },
+  { id: "timeline", label: "Timeline" },
+  { id: "validation", label: "Validation" },
+  { id: "state", label: "State" },
+];
 
 export default function App() {
-  const { activeTab, setTab, assembly } = useStore();
+  const {
+    activeTab, setTab, assembly, loading, prompt,
+    setAssembly, setLoading, setPlaying, reset,
+  } = useStore();
+
+  const run = async () => {
+    setLoading(true);
+    setPlaying(false);
+    try {
+      const next = await runWorkflow(prompt, true);
+      setAssembly(next);
+      setTab("drawing");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const repair = async () => {
+    setLoading(true);
+    try {
+      setAssembly(await repairOnce());
+      setTab("validation");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const animate = () => {
+    setTab("simulation");
+    setPlaying(true);
+  };
+
+  const doReset = async () => {
+    await resetProject();
+    reset();
+  };
+
+  const passed = assembly?.validation.passed;
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "280px 1fr 320px", height: "100vh", fontFamily: "system-ui" }}>
-      <aside style={{ borderRight: "1px solid #ddd", padding: 12 }}><PromptPanel /></aside>
-      <main style={{ display: "flex", flexDirection: "column" }}>
-        <nav style={{ display: "flex", gap: 4, padding: 8, borderBottom: "1px solid #ddd" }}>
-          {TABS.map((t) => <button key={t} onClick={() => setTab(t)} style={{ fontWeight: activeTab === t ? 700 : 400 }}>{t}</button>)}
-        </nav>
-        <section style={{ flex: 1, overflow: "auto", padding: 12 }}>
-          {assembly ? (
-            <>
-              {activeTab === "drawing" && <DrawingView />}
-              {activeTab === "simulation" && <SimulationView />}
-              {activeTab === "orchestration" && <OrchestrationView />}
-              {activeTab === "timeline" && <TimelineView />}
-              {activeTab === "validation" && <ValidationView />}
-              {activeTab === "state" && <StateExportView />}
-            </>
-          ) : <p>Run a workflow to begin.</p>}
-        </section>
-      </main>
-      <aside style={{ borderLeft: "1px solid #ddd", padding: 12 }}><StatusPanel /></aside>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="logo">⚙</span>
+          <span>AssemblyCAD&nbsp;AI</span>
+          <span className="sub">· agent-controlled 2D CAD</span>
+        </div>
+
+        {assembly && (
+          <span className={`pill ${passed ? "ok" : "fail"}`}>
+            <span className="dot" style={{ background: passed ? "var(--ok)" : "var(--fail)" }} />
+            {passed ? "Validation passed" : "Validation failed"}
+          </span>
+        )}
+
+        <div className="actions">
+          <button className="btn btn-primary btn-lg" onClick={run} disabled={loading}>
+            {loading ? <span className="spin" /> : "▶"} Run Workflow
+          </button>
+          <button className="btn btn-accent" onClick={animate} disabled={!assembly || loading}>
+            ✦ Animate
+          </button>
+          <button className="btn" onClick={repair} disabled={!assembly || loading}>
+            ✦ Repair Once
+          </button>
+          <button className="btn btn-ghost btn-danger" onClick={doReset} disabled={loading}>
+            Reset
+          </button>
+        </div>
+      </header>
+
+      <div className="body">
+        <aside className="pane-left">
+          <PromptPanel />
+        </aside>
+
+        <main className="pane-main">
+          <nav className="tabs">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                className={`tab ${activeTab === t.id ? "active" : ""}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <section className="tab-body">
+            {assembly ? (
+              <>
+                {activeTab === "drawing" && <DrawingView />}
+                {activeTab === "simulation" && <SimulationView />}
+                {activeTab === "orchestration" && <OrchestrationView />}
+                {activeTab === "timeline" && <TimelineView />}
+                {activeTab === "validation" && <ValidationView />}
+                {activeTab === "state" && <StateExportView />}
+              </>
+            ) : (
+              <div className="empty">
+                <div>
+                  <div className="big">No assembly yet</div>
+                  <div>Click <strong>Run Workflow</strong> to generate the cube gearbox.</div>
+                </div>
+              </div>
+            )}
+          </section>
+        </main>
+
+        <aside className="pane-right">
+          <StatusPanel />
+        </aside>
+      </div>
     </div>
   );
 }
