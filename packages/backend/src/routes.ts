@@ -3,7 +3,7 @@ import { runWorkflow, runRepairOnce } from "./agents/orchestrator";
 import { store } from "./store";
 import type { WorkflowParams } from "./agents/types";
 
-const DEFAULT_PARAMS: WorkflowParams = { module: 2, teethA: 20, teethB: 20 };
+const DEFAULT_PARAMS: WorkflowParams = { designId: "cube-gearbox", module: 2, teethA: 20, teethB: 20 };
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workflow/run", async (req) => {

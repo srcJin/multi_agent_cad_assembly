@@ -8,6 +8,7 @@ import { runSimulationAgent } from "./simulation";
 import { runValidationAgent } from "./validation";
 import { runRepairCoordinator } from "./repair";
 import type { WorkflowParams, AgentContext, AgentResult } from "./types";
+import { resolveDesign } from "./design";
 
 // Apply weave.op lazily at first call (after initObservability has run at startup),
 // so the enabled path never hits the synchronous createRequire fallback. When Weave
@@ -32,7 +33,7 @@ const opRepair: AgentFn = lazyOp(async (s, c) => runRepairCoordinator(s, c), { n
 interface RunOpts { seedFailure?: boolean }
 
 async function runWorkflowImpl(prompt: string, params: WorkflowParams, opts: RunOpts = {}): Promise<AssemblyState> {
-  let state = createEmptyState("cube-gearbox", prompt);
+  let state = createEmptyState(resolveDesign(params, prompt).projectName, prompt);
   let step = 0;
   const pump = async (fn: AgentFn) => {
     const res = await fn(state, { step, params });

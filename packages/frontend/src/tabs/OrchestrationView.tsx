@@ -1,36 +1,104 @@
-import ReactFlow, { Background, type Node, type Edge } from "reactflow";
-import "reactflow/dist/style.css";
-import type { AgentState } from "@cad/shared";
 import { useStore } from "../lib/store";
+import { buildOrchestrationStages, type OrchestrationStage } from "../lib/orchestrationStages";
 
-const STATUS_COLOR: Record<string, string> = { idle: "#bbb", planning: "#e8b339", running: "#3d6be0", waiting: "#9b59b6", completed: "#37a169", failed: "#e0533d", repaired: "#1e9e8a", skipped: "#888" };
-const ORDER = ["DirectorAgent","LayoutPreviewAgent","BoxDrawingAgent","GearADrawingAgent","GearBDrawingAgent","ShaftADrawingAgent","ShaftBDrawingAgent","LidDrawingAgent","SimulationAgent","ValidationAgent","RepairCoordinator"];
+const STATUS_COLOR: Record<string, string> = {
+  idle: "#8b949e",
+  planning: "#d29922",
+  running: "#6e8bff",
+  waiting: "#9b59b6",
+  completed: "#3fb950",
+  failed: "#f85149",
+  repaired: "#38d6c8",
+  skipped: "#586069",
+  ok: "#3fb950",
+  fail: "#f85149",
+};
 
-export function agentsToNodes(agents: AgentState[]): Node[] {
-  return agents.map((a) => {
-    const idx = ORDER.indexOf(a.name);
-    const col = idx < 0 ? 0 : idx % 4, row = idx < 0 ? 0 : Math.floor(idx / 4);
-    return { id: a.name, position: { x: col * 200, y: row * 110 }, data: { label: `${a.name}\n[${a.status}]`, status: a.status }, style: { border: `2px solid ${STATUS_COLOR[a.status] ?? "#bbb"}`, borderRadius: 8, padding: 6, fontSize: 11, whiteSpace: "pre-line", width: 160 } };
-  });
+function clampIndex(index: number, stages: OrchestrationStage[]): number {
+  return Math.max(0, Math.min(index, stages.length - 1));
 }
 
-function pipelineEdges(agents: AgentState[]): Edge[] {
-  const present = new Set(agents.map((a) => a.name));
-  const seq = ORDER.filter((n) => present.has(n));
-  const edges: Edge[] = [];
-  for (let i = 0; i < seq.length - 1; i++) edges.push({ id: `${seq[i]}-${seq[i + 1]}`, source: seq[i], target: seq[i + 1] });
-  for (const a of agents) if (a.status === "repaired") edges.push({ id: `repair-${a.name}`, source: "RepairCoordinator", target: a.name, animated: true, style: { stroke: "#e0533d" }, label: "repair" });
-  return edges;
+function statusColor(status: string): string {
+  return STATUS_COLOR[status] ?? "#8b949e";
+}
+
+function AgentCard({ agent }: { agent: OrchestrationStage["agents"][number] }) {
+  const parts = agent.affectedParts.length ? agent.affectedParts : agent.owns;
+
+  return (
+    <article className="orch-agent-card" style={{ borderLeftColor: statusColor(agent.status) }}>
+      <div className="orch-agent-head">
+        <span className="orch-agent-name">{agent.name}</span>
+        <span className="orch-status" style={{ color: statusColor(agent.status) }}>{agent.status}</span>
+      </div>
+      <div className="orch-agent-role">{agent.role}</div>
+      <div className="orch-action">{agent.action}</div>
+      <div className="orch-meta-row">
+        {agent.tool ? <span className="orch-tool">{agent.tool}</span> : null}
+        {parts.map((part) => <span key={part} className="tag">{part}</span>)}
+      </div>
+    </article>
+  );
 }
 
 export function OrchestrationView() {
-  const { assembly } = useStore();
+  const { assembly, previewStep, setPreviewStep } = useStore();
   if (!assembly) return <p>No assembly.</p>;
+
+  const stages = buildOrchestrationStages(assembly.timeline, assembly.agents);
+  const selectedIndex = previewStep === null ? stages.length : stages.findIndex((stage) => stage.step === previewStep);
+  const selectedLabel = previewStep === null ? "Final result" : `Step ${previewStep}`;
+  const canGoBack = stages.length > 0 && selectedIndex > 0;
+  const canGoForward = stages.length > 0 && selectedIndex < stages.length;
+
+  const moveBy = (delta: number) => {
+    if (!stages.length) return;
+    if (previewStep === null) {
+      setPreviewStep(stages[stages.length - 1].step);
+      return;
+    }
+    const current = stages.findIndex((stage) => stage.step === previewStep);
+    const next = current + delta;
+    if (next >= stages.length) setPreviewStep(null);
+    else setPreviewStep(stages[clampIndex(next, stages)].step);
+  };
+
   return (
-    <div className="orch-frame" style={{ height: "100%", minHeight: 460 }}>
-      <ReactFlow nodes={agentsToNodes(assembly.agents)} edges={pipelineEdges(assembly.agents)} fitView>
-        <Background color="#232b38" gap={18} />
-      </ReactFlow>
+    <div className="orch-frame">
+      <div className="orch-controls">
+        <div>
+          <div className="orch-kicker">Orchestration</div>
+          <div className="orch-current">{selectedLabel}</div>
+        </div>
+        <div className="orch-buttons">
+          <button className="btn btn-ghost" onClick={() => setPreviewStep(stages[0]?.step ?? null)} disabled={!stages.length}>Start</button>
+          <button className="btn btn-ghost" onClick={() => moveBy(-1)} disabled={!canGoBack}>Prev</button>
+          <button className="btn btn-ghost" onClick={() => moveBy(1)} disabled={!canGoForward}>Next</button>
+          <button className="btn btn-ghost" onClick={() => setPreviewStep(null)}>Final</button>
+        </div>
+      </div>
+      <div className="orch-flow" aria-label="Agent orchestration flow">
+        {stages.map((stage) => (
+          <section
+            key={stage.step}
+            className={`orch-stage ${stage.isDispatch ? "dispatch" : ""} ${stage.failed ? "fail" : ""} ${previewStep === stage.step ? "active" : ""}`}
+            data-testid="orch-stage"
+          >
+            <button className="orch-marker" onClick={() => setPreviewStep(stage.step)} aria-label={`Preview step ${stage.step}`}>
+              <span>{stage.step}</span>
+            </button>
+            <div className="orch-stage-body">
+              <div className="orch-stage-title">
+                <span>{stage.title}</span>
+                {stage.isDispatch ? <span className="orch-dispatch-count">parallel</span> : null}
+              </div>
+              <div className={stage.isDispatch ? "orch-agent-grid" : "orch-agent-stack"}>
+                {stage.agents.map((agent) => <AgentCard key={agent.name} agent={agent} />)}
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

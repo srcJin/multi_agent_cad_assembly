@@ -12,7 +12,6 @@ import { StateExportView } from "./tabs/StateExportView";
 const TABS: { id: TabId; label: string }[] = [
   { id: "drawing", label: "Drawing" },
   { id: "simulation", label: "Simulation" },
-  { id: "orchestration", label: "Orchestration" },
   { id: "timeline", label: "Timeline" },
   { id: "validation", label: "Validation" },
   { id: "state", label: "State" },
@@ -20,7 +19,7 @@ const TABS: { id: TabId; label: string }[] = [
 
 export default function App() {
   const {
-    activeTab, setTab, assembly, loading, prompt,
+    activeTab, setTab, assembly, loading, prompt, designPreset,
     setAssembly, setLoading, setPlaying, reset,
   } = useStore();
 
@@ -28,7 +27,7 @@ export default function App() {
     setLoading(true);
     setPlaying(false);
     try {
-      const next = await runWorkflow(prompt, true);
+      const next = await runWorkflow(prompt, designPreset, true);
       setAssembly(next);
       setTab("drawing");
     } finally {
@@ -39,7 +38,7 @@ export default function App() {
   const repair = async () => {
     setLoading(true);
     try {
-      setAssembly(await repairOnce());
+      setAssembly(await repairOnce(designPreset));
       setTab("validation");
     } finally {
       setLoading(false);
@@ -109,19 +108,23 @@ export default function App() {
           </nav>
           <section className="tab-body">
             {assembly ? (
-              <>
-                {activeTab === "drawing" && <DrawingView />}
-                {activeTab === "simulation" && <SimulationView />}
-                {activeTab === "orchestration" && <OrchestrationView />}
-                {activeTab === "timeline" && <TimelineView />}
-                {activeTab === "validation" && <ValidationView />}
-                {activeTab === "state" && <StateExportView />}
-              </>
+              <div className="demo-workspace">
+                <div className="result-panel">
+                  {activeTab === "drawing" && <DrawingView />}
+                  {activeTab === "simulation" && <SimulationView />}
+                  {activeTab === "timeline" && <TimelineView />}
+                  {activeTab === "validation" && <ValidationView />}
+                  {activeTab === "state" && <StateExportView />}
+                </div>
+                <aside className="orchestration-panel">
+                  <OrchestrationView />
+                </aside>
+              </div>
             ) : (
               <div className="empty">
                 <div>
                   <div className="big">No assembly yet</div>
-                  <div>Click <strong>Run Workflow</strong> to generate the cube gearbox.</div>
+                  <div>Click <strong>Run Workflow</strong> to generate the selected design.</div>
                 </div>
               </div>
             )}

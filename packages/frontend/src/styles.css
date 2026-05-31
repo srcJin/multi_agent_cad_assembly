@@ -154,6 +154,21 @@ body {
 .tab .dot { width: 7px; height: 7px; border-radius: 50%; }
 
 .tab-body { flex: 1; overflow: auto; padding: 16px; min-height: 0; }
+.demo-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+}
+.result-panel {
+  min-width: 0;
+  min-height: 0;
+}
+.orchestration-panel {
+  min-width: 0;
+  min-height: 0;
+}
 
 .empty {
   height: 100%; display: grid; place-items: center;
@@ -169,6 +184,31 @@ body {
   padding: 10px 12px; font-family: var(--sans); font-size: 13px; line-height: 1.5;
 }
 .prompt-area:focus { outline: none; border-color: var(--accent); }
+.design-switch {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.design-option {
+  appearance: none;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font: 700 12px var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.design-option:hover { border-color: #2f3a4d; color: var(--text); }
+.design-option.active {
+  color: var(--text);
+  border-color: rgba(110,139,255,0.55);
+  background: #1a2233;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .field-label { font-size: 12px; color: var(--text-dim); margin: 14px 0 6px; font-weight: 600; }
 .btn-stack { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 
@@ -232,8 +272,20 @@ body {
 }
 
 /* ---------- Drawing ---------- */
+.draw-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+.draw-wrap .sim-legend {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
 .draw-frame {
-  height: 100%; border: 1px solid var(--border); border-radius: var(--radius);
+  flex: 1 1 auto; min-height: 0;
+  border: 1px solid var(--border); border-radius: var(--radius);
   background: #0f141d; box-shadow: var(--shadow); overflow: hidden;
 }
 
@@ -286,4 +338,190 @@ body {
 ::-webkit-scrollbar-thumb { background: #232b38; border-radius: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-.orch-frame { height: 100%; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: #0f141d; }
+.orch-frame {
+  height: 100%;
+  min-height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  background: #0f141d;
+  box-shadow: var(--shadow);
+}
+.orch-controls {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(15, 20, 29, 0.96);
+  border-bottom: 1px solid var(--border);
+}
+.orch-kicker {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.orch-current {
+  margin-top: 2px;
+  color: var(--text);
+  font-weight: 800;
+}
+.orch-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.orch-buttons .btn {
+  justify-content: center;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.orch-flow {
+  position: relative;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 18px 12px 18px 58px;
+}
+.orch-flow::before {
+  content: "";
+  position: absolute;
+  top: 34px;
+  bottom: 34px;
+  left: 28px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  opacity: 0.8;
+}
+.orch-stage {
+  position: relative;
+  min-height: 74px;
+  margin-bottom: 12px;
+}
+.orch-stage:last-child { margin-bottom: 0; }
+.orch-marker {
+  appearance: none;
+  position: absolute;
+  left: -45px;
+  top: 2px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #121925;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 5px #0f141d;
+  font-family: var(--mono);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.orch-stage.dispatch .orch-marker { border-color: var(--accent-2); }
+.orch-stage.fail .orch-marker { border-color: var(--fail); }
+.orch-stage.active .orch-marker {
+  background: var(--accent);
+  color: #0b1020;
+}
+.orch-stage.active .orch-stage-body {
+  border-color: rgba(110,139,255,0.65);
+}
+.orch-stage-body {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  padding: 12px;
+}
+.orch-stage.dispatch .orch-stage-body {
+  border-color: rgba(56, 214, 200, 0.35);
+  background: #121a24;
+}
+.orch-stage.fail .orch-stage-body { border-color: rgba(248,81,73,0.4); }
+.orch-stage-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 800;
+}
+.orch-dispatch-count {
+  color: var(--accent-2);
+  border: 1px solid rgba(56, 214, 200, 0.35);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.orch-agent-stack { display: grid; gap: 8px; }
+.orch-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+.orch-agent-card {
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid var(--text-faint);
+  border-radius: var(--radius-sm);
+  background: #0d1117;
+  padding: 10px 11px;
+  min-width: 0;
+}
+.orch-agent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.orch-agent-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+  font-size: 13px;
+}
+.orch-status {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.orch-agent-role {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.orch-action {
+  color: var(--text-dim);
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.orch-meta-row {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.orch-tool {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent-2);
+  background: var(--bg-elev-2);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+
+@media (max-width: 720px) {
+  .demo-workspace { grid-template-columns: 1fr; }
+  .result-panel, .orchestration-panel { min-height: auto; }
+  .orch-flow { padding: 18px 12px 18px 58px; }
+  .orch-flow::before { left: 28px; }
+  .orch-marker { left: -45px; width: 32px; height: 32px; }
+  .orch-agent-grid { grid-template-columns: 1fr; }
+}

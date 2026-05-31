@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "../lib/store";
 import { buildWorld, type WorldHandle } from "../simulation/planckWorld";
 import type { AssemblyState, Point } from "@cad/shared";
+import { visiblePartsAtStep } from "../lib/stepPreview";
 
 const W = 680;
 const H = 460;
@@ -9,7 +10,7 @@ const H = 460;
 const DRIVE_SPEED = 0.9; // rad/s of the driving gear (gearA)
 
 export function SimulationView() {
-  const { assembly, playing, setPlaying } = useStore();
+  const { assembly, playing, setPlaying, previewStep } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<WorldHandle | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -25,10 +26,19 @@ export function SimulationView() {
   const renderAngle = (id: string): number => {
     const a = assemblyRef.current;
     if (id === "gearA") return angleRef.current;
-    if (id === "gearB") {
-      const rA = a?.parts.find((p) => p.id === "gearA")?.simulation.radius ?? 1;
-      const rB = a?.parts.find((p) => p.id === "gearB")?.simulation.radius ?? 1;
-      return -angleRef.current * (rA / rB);
+    const rA = a?.parts.find((p) => p.id === "gearA")?.simulation.radius ?? 1;
+    const rB = a?.parts.find((p) => p.id === "gearB")?.simulation.radius ?? 1;
+    const gearBAngle = -angleRef.current * (rA / rB);
+    if (id === "gearB") return gearBAngle;
+    if (id === "gearC" && a?.projectName !== "compound-gearbox") {
+      const rC = a?.parts.find((p) => p.id === "gearC")?.simulation.radius ?? 1;
+      return -gearBAngle * (rB / rC);
+    }
+    if (id === "gearC") return gearBAngle;
+    if (id === "gearD") {
+      const rC = a?.parts.find((p) => p.id === "gearC")?.simulation.radius ?? 1;
+      const rD = a?.parts.find((p) => p.id === "gearD")?.simulation.radius ?? 1;
+      return -gearBAngle * (rC / rD);
     }
     return 0;
   };
@@ -50,6 +60,8 @@ export function SimulationView() {
     const colorFor = (id: string, type: string) => {
       if (id === "gearA") return "#6e8bff";
       if (id === "gearB") return "#38d6c8";
+      if (id === "gearC") return "#d29922";
+      if (id === "gearD") return "#f85149";
       if (type === "box") return "#3a4254";
       if (type === "shaft") return "#d29922";
       return "#586069";
@@ -70,7 +82,7 @@ export function SimulationView() {
 
     // draw box & lid first (background), then shafts, then gears on top
     const order = (t: string) => (t === "box" ? 0 : t === "lid" ? 1 : t === "shaft" ? 2 : 3);
-    const parts = [...a.parts].sort((p, q) => order(p.type) - order(q.type));
+    const parts = [...visiblePartsAtStep(a, previewStep)].sort((p, q) => order(p.type) - order(q.type));
 
     for (const part of parts) {
       const outline = part.drawing?.outline;
@@ -79,7 +91,7 @@ export function SimulationView() {
       const angle = part.type === "gear" ? renderAngle(part.id) : 0;
       const col = colorFor(part.id, part.type);
       const fill = part.type === "gear"
-        ? (part.id === "gearA" ? "rgba(110,139,255,0.18)" : "rgba(56,214,200,0.18)")
+        ? (part.id === "gearA" ? "rgba(110,139,255,0.18)" : part.id === "gearB" ? "rgba(56,214,200,0.18)" : part.id === "gearC" ? "rgba(210,153,34,0.16)" : "rgba(248,81,73,0.14)")
         : part.type === "shaft" ? "rgba(210,153,34,0.5)" : undefined;
       drawPoly(outline, pivot, angle, col, fill);
 
@@ -110,7 +122,7 @@ export function SimulationView() {
   useEffect(() => {
     if (assembly) { handleRef.current = buildWorld(assembly); draw(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assembly]);
+  }, [assembly, previewStep]);
 
   // animation loop driven by shared `playing` flag — time-based so motion is
   // smooth and frame-rate independent.
@@ -147,9 +159,12 @@ export function SimulationView() {
         </button>
         <button className="btn" onClick={step} disabled={playing}>⏭ Step</button>
         <span className="rpm">{playing ? "running · gearA motorized" : "paused"}</span>
+        {previewStep !== null && <span className="rpm">preview step {previewStep}</span>}
         <div className="sim-legend" style={{ marginLeft: "auto" }}>
           <span className="item"><span className="sw" style={{ background: "#6e8bff" }} /> Gear A</span>
           <span className="item"><span className="sw" style={{ background: "#38d6c8" }} /> Gear B</span>
+          {assembly.parts.some((part) => part.id === "gearC") && <span className="item"><span className="sw" style={{ background: "#d29922" }} /> Gear C</span>}
+          {assembly.parts.some((part) => part.id === "gearD") && <span className="item"><span className="sw" style={{ background: "#f85149" }} /> Gear D</span>}
           <span className="item"><span className="sw" style={{ background: "#d29922" }} /> Shaft</span>
           <span className="item"><span className="sw" style={{ background: "#3a4254" }} /> Box</span>
         </div>

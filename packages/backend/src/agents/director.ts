@@ -1,29 +1,7 @@
 import type { AssemblyState, Part, PartType, AgentState } from "@cad/shared";
 import { recordToolCall } from "../tools/registry";
 import type { AgentContext, AgentResult } from "./types";
-
-const PART_ROSTER: ReadonlyArray<[string, PartType, string]> = [
-  ["box", "box", "BoxDrawingAgent"],
-  ["gearA", "gear", "GearADrawingAgent"],
-  ["gearB", "gear", "GearBDrawingAgent"],
-  ["shaftA", "shaft", "ShaftADrawingAgent"],
-  ["shaftB", "shaft", "ShaftBDrawingAgent"],
-  ["lid", "lid", "LidDrawingAgent"],
-];
-
-export const AGENT_ROSTER: ReadonlyArray<[string, string]> = [
-  ["DirectorAgent", "Director"],
-  ["LayoutPreviewAgent", "Layout"],
-  ["BoxDrawingAgent", "Part:box"],
-  ["GearADrawingAgent", "Part:gearA"],
-  ["GearBDrawingAgent", "Part:gearB"],
-  ["ShaftADrawingAgent", "Part:shaftA"],
-  ["ShaftBDrawingAgent", "Part:shaftB"],
-  ["LidDrawingAgent", "Part:lid"],
-  ["SimulationAgent", "Simulation"],
-  ["ValidationAgent", "Validation"],
-  ["RepairCoordinator", "Repair"],
-];
+import { resolveDesign } from "./design";
 
 function emptyPart(id: string, type: PartType, owner: string): Part {
   return {
@@ -35,17 +13,20 @@ function emptyPart(id: string, type: PartType, owner: string): Part {
 }
 
 export function runDirector(state: AssemblyState, ctx: AgentContext): AgentResult {
-  state.designIntent = "2D cube gearbox: two meshing gears on fixed shafts inside a box, no collision.";
-  const partIds = PART_ROSTER.map(([id]) => id);
+  const design = resolveDesign(ctx.params, state.userPrompt);
+  state.projectName = design.projectName;
+  state.designIntent = design.intent;
+  const partIds = design.parts.map(([id]) => id);
   state.planText =
-    `Design intent: build a 2D cube gearbox from "${state.userPrompt}". ` +
-    `Decompose into [${partIds.join(", ")}], lay out two meshing gears on fixed shafts inside a box ` +
-    `with clearance, then validate meshing, coaxial shafts, containment and drawing/simulation consistency.`;
+    `Design intent: build a ${design.label} from "${state.userPrompt}". ` +
+    `Decompose into [${partIds.join(", ")}], lay out ${design.meshes.length} gear mesh${design.meshes.length === 1 ? "" : "es"} ` +
+    `across ${new Set(design.gears.map((gear) => gear.shaftId)).size} fixed shafts inside a box with clearance, ` +
+    `then validate meshing, coaxial shafts, containment and drawing/simulation consistency.`;
 
-  state.parts = PART_ROSTER.map(([id, type, owner]) => emptyPart(id, type, owner));
-  state.agents = AGENT_ROSTER.map<AgentState>(([name, role]) => ({
+  state.parts = design.parts.map(([id, type, owner]) => emptyPart(id, type, owner));
+  state.agents = design.agents.map<AgentState>(([name, role]) => ({
     name, role, status: "idle",
-    owns: PART_ROSTER.filter(([, , owner]) => owner === name).map(([id]) => id),
+    owns: design.parts.filter(([, , owner]) => owner === name).map(([id]) => id),
   }));
   const dir = state.agents.find((a) => a.name === "DirectorAgent");
   if (dir) dir.status = "completed";

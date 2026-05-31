@@ -4,6 +4,8 @@ import { recordToolCall } from "../src/tools/registry";
 import { runWorkflow, runRepairOnce } from "../src/agents/orchestrator";
 
 const params = { module: 2, teethA: 20, teethB: 20 };
+const compoundParams = { designId: "compound-gearbox" as const, module: 2, teethA: 16, teethB: 36, teethC: 14, teethD: 34 };
+const idlerParams = { designId: "idler-transfer" as const, module: 2, teethA: 18, teethB: 28, teethC: 22 };
 
 describe("tool registry", () => {
   it("appends a tool call to state", () => {
@@ -21,6 +23,22 @@ describe("orchestrator", () => {
     expect(state.constraints.length).toBeGreaterThanOrEqual(4);
     expect(state.timeline.length).toBeGreaterThanOrEqual(8);
     expect(state.validation.items.length).toBeGreaterThan(0);
+  });
+
+  it("runs the compound gearbox pipeline without replacing the cube design", async () => {
+    const state = await runWorkflow("Create a compact compound reduction gearbox", compoundParams);
+    expect(state.projectName).toBe("compound-gearbox");
+    expect(state.parts.map((part) => part.id)).toEqual(["box", "gearA", "gearB", "gearC", "gearD", "shaftA", "shaftB", "shaftC", "lid"]);
+    expect(state.constraints.filter((constraint) => constraint.type === "gear_mesh")).toHaveLength(2);
+    expect(state.validation.passed).toBe(true);
+  });
+
+  it("runs the idler transfer pipeline as a third design case", async () => {
+    const state = await runWorkflow("Create an idler transfer gearbox", idlerParams);
+    expect(state.projectName).toBe("idler-transfer");
+    expect(state.parts.map((part) => part.id)).toEqual(["box", "gearA", "gearB", "gearC", "shaftA", "shaftB", "shaftC", "lid"]);
+    expect(state.constraints.filter((constraint) => constraint.type === "gear_mesh")).toHaveLength(2);
+    expect(state.validation.passed).toBe(true);
   });
 
   it("seeded failure then repair passes", async () => {

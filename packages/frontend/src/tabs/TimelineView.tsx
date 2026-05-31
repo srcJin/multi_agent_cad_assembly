@@ -1,11 +1,13 @@
 import { useStore } from "../lib/store";
+import { eventsThroughStep } from "../lib/stepPreview";
 
 export function TimelineView() {
-  const { assembly } = useStore();
+  const { assembly, previewStep } = useStore();
   if (!assembly) return <p>No assembly.</p>;
+  const events = eventsThroughStep(assembly.timeline, previewStep);
   return (
     <ol className="timeline">
-      {assembly.timeline.map((e, i) => (
+      {events.map((e, i) => (
         <li key={i} data-testid="timeline-row" className={`tl-row ${e.status === "fail" ? "fail" : ""}`}>
           <span className="step">{e.step}</span>
           <span>
