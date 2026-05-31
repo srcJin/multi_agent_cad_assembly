@@ -7,15 +7,17 @@ export function SimulationView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<WorldHandle | null>(null);
   const rafRef = useRef<number | null>(null);
+  const assemblyRef = useRef(assembly);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    if (assembly) handleRef.current = buildWorld(assembly);
+    assemblyRef.current = assembly;
   }, [assembly]);
 
   const draw = () => {
     const canvas = canvasRef.current, handle = handleRef.current;
-    if (!canvas || !handle || !assembly) return;
+    const a = assemblyRef.current;
+    if (!canvas || !handle || !a) return;
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
@@ -23,7 +25,7 @@ export function SimulationView() {
     ctx.scale(2, -2);
     for (const [id, body] of Object.entries(handle.bodies)) {
       const pos = body.getPosition(), angle = body.getAngle();
-      const r = (assembly.parts as any[]).find((p) => p.id === id)?.simulation?.radius ?? 2;
+      const r = (a.parts as any[]).find((p) => p.id === id)?.simulation?.radius ?? 2;
       ctx.save();
       ctx.translate(pos.x, pos.y);
       ctx.rotate(angle);
@@ -60,6 +62,7 @@ export function SimulationView() {
   }, [playing]);
 
   useEffect(() => {
+    if (assembly) handleRef.current = buildWorld(assembly);
     draw();
   }, [assembly]);
 
