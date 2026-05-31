@@ -6,27 +6,31 @@ import type { AssemblyState, Point } from "@cad/shared";
 const W = 680;
 const H = 460;
 
+const DRIVE_SPEED = 0.9; // rad/s of the driving gear (gearA)
+
 export function SimulationView() {
   const { assembly, playing, setPlaying } = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<WorldHandle | null>(null);
   const rafRef = useRef<number | null>(null);
   const assemblyRef = useRef<AssemblyState | null>(assembly);
+  const angleRef = useRef(0);        // accumulated drive angle (gearA)
+  const lastTsRef = useRef<number | null>(null);
 
   useEffect(() => { assemblyRef.current = assembly; }, [assembly]);
 
-  // Visual rotation: gearA from physics; gearB derived (counter-rotates per ratio)
-  // so meshing reads correctly even though only gearA is motorized.
+  // Kinematic rotation: gearA spins at a fixed rate; gearB counter-rotates by the
+  // gear ratio so the mesh reads correctly. Real dynamics aren't the point here
+  // (PRD §23.2 — the sim view validates motion *relationships*, not torque).
   const renderAngle = (id: string): number => {
-    const handle = handleRef.current, a = assemblyRef.current;
-    if (!handle || !a) return 0;
+    const a = assemblyRef.current;
+    if (id === "gearA") return angleRef.current;
     if (id === "gearB") {
-      const angA = handle.bodies.gearA?.getAngle() ?? 0;
-      const rA = a.parts.find((p) => p.id === "gearA")?.simulation.radius ?? 1;
-      const rB = a.parts.find((p) => p.id === "gearB")?.simulation.radius ?? 1;
-      return -angA * (rA / rB);
+      const rA = a?.parts.find((p) => p.id === "gearA")?.simulation.radius ?? 1;
+      const rB = a?.parts.find((p) => p.id === "gearB")?.simulation.radius ?? 1;
+      return -angleRef.current * (rA / rB);
     }
-    return handle.bodies[id]?.getAngle() ?? 0;
+    return 0;
   };
 
   const draw = () => {
@@ -95,7 +99,12 @@ export function SimulationView() {
     ctx.restore();
   };
 
-  const step = () => { handleRef.current?.world.step(1 / 60); draw(); };
+  // advance one fixed tick (also steps the physics world so it stays a real sim)
+  const step = () => {
+    angleRef.current += DRIVE_SPEED / 60;
+    handleRef.current?.world.step(1 / 60);
+    draw();
+  };
 
   // rebuild world + redraw whenever the assembly changes
   useEffect(() => {
@@ -103,10 +112,23 @@ export function SimulationView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assembly]);
 
-  // animation loop driven by shared `playing` flag
+  // animation loop driven by shared `playing` flag — time-based so motion is
+  // smooth and frame-rate independent.
   useEffect(() => {
-    if (!playing) { if (rafRef.current) cancelAnimationFrame(rafRef.current); return; }
-    const loop = () => { step(); rafRef.current = requestAnimationFrame(loop); };
+    if (!playing) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      lastTsRef.current = null;
+      return;
+    }
+    const loop = (ts: number) => {
+      const last = lastTsRef.current ?? ts;
+      const dt = Math.min(0.05, (ts - last) / 1000); // clamp big gaps
+      lastTsRef.current = ts;
+      angleRef.current += DRIVE_SPEED * dt;
+      handleRef.current?.world.step(dt);
+      draw();
+      rafRef.current = requestAnimationFrame(loop);
+    };
     rafRef.current = requestAnimationFrame(loop);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
