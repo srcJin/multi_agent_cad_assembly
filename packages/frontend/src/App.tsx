@@ -1,5 +1,6 @@
 import { useStore, type TabId } from "./lib/store";
 import { PromptPanel } from "./components/PromptPanel";
+import { DrawingView } from "./tabs/DrawingView";
 
 const TABS: TabId[] = ["drawing", "simulation", "orchestration", "timeline", "validation", "state"];
 
@@ -13,7 +14,9 @@ export default function App() {
           {TABS.map((t) => <button key={t} onClick={() => setTab(t)} style={{ fontWeight: activeTab === t ? 700 : 400 }}>{t}</button>)}
         </nav>
         <section style={{ flex: 1, overflow: "auto", padding: 12 }}>
-          {assembly ? <div data-testid="active-tab">{activeTab} view</div> : <p>Run a workflow to begin.</p>}
+          {assembly ? (
+            activeTab === "drawing" ? <DrawingView /> : <div data-testid="active-tab">{activeTab} view</div>
+          ) : <p>Run a workflow to begin.</p>}
         </section>
       </main>
       <aside style={{ borderLeft: "1px solid #ddd", padding: 12 }}><p>Status panel</p></aside>
