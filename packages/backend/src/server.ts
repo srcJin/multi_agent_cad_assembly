@@ -20,6 +20,7 @@ async function main() {
 }
 
 // run only when invoked directly (not under test import)
-if (process.argv[1] && process.argv[1].endsWith("server.ts")) {
+const isMain = process.argv[1] && (process.argv[1].endsWith("server.ts") || process.argv[1].endsWith("server.js"));
+if (isMain) {
   main();
 }

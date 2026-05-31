@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: assemblycad-backend
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm --filter @cad/backend start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000
+    # Root directory stays at repo root to allow pnpm to see the workspace
