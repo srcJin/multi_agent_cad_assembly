@@ -1,6 +1,13 @@
-import { primitives, booleans, geometries, transforms } from "@jscad/modeling";
+import { createRequire } from "module";
 import type { Point } from "@cad/shared";
 import { outerRadius, rootRadius } from "./gearMath";
+
+// @jscad/modeling ships as CommonJS. Under real Node ESM (tsx/node), named
+// imports like `{ booleans }` cannot be statically bound from a CJS module, so
+// we load it via createRequire — which works identically under Vitest and tsx.
+const require = createRequire(import.meta.url);
+const { primitives, booleans, geometries, transforms } =
+  require("@jscad/modeling") as typeof import("@jscad/modeling");
 
 const { circle, polygon } = primitives;
 const { union, subtract } = booleans;
