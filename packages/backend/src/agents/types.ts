@@ -1,11 +1,17 @@
 import type { AssemblyState, TimelineEvent } from "@cad/shared";
 
-export interface AgentContext {
-  step: number;
-  params: Record<string, number>;
+export interface WorkflowParams {
+  module: number;
+  teethA: number;
+  teethB: number;
+  pressureAngle?: number;
+  bore?: number;
+  shaftDiameter?: number;
 }
 
-export interface AgentResult {
-  state: AssemblyState;
-  events: TimelineEvent[];
+export interface AgentContext {
+  step: number;
+  params: WorkflowParams;
 }
+
+export type AgentResult = { state: AssemblyState; events: TimelineEvent[] };
