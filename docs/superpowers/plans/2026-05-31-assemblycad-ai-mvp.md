@@ -493,7 +493,7 @@ git commit -m "feat(shared): add Assembly State types and factory (single source
     "@jscad/modeling": "^2.12.0",
     "fastify": "^4.27.0",
     "@fastify/cors": "^9.0.0",
-    "weave": "^0.9.0"
+    "weave": "^1.1.0"
   },
   "devDependencies": {
     "tsx": "^4.10.0",
