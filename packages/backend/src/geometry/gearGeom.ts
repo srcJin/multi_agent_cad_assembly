@@ -48,10 +48,10 @@ export function generateGearOutline(spec: GearSpec): Point[] {
   if (bore > 0) {
     gear = subtract(gear, circle({ radius: bore / 2, segments: 24 }));
   }
-  gear = translate([center[0], center[1], 0], gear) as ReturnType<typeof union>;
+  const gearTranslated = translate([center[0], center[1], 0], gear);
 
   // outermost outline (the boolean may yield the bore as a second outline; take the largest)
-  const outlines = geom2.toOutlines(gear as Parameters<typeof geom2.toOutlines>[0]);
+  const outlines = geom2.toOutlines(gearTranslated as Parameters<typeof geom2.toOutlines>[0]);
   const ranked = outlines
     .map((o) => o.map((pt) => [pt[0], pt[1]] as Point))
     .sort((a, b) => boundingSpan(b) - boundingSpan(a));

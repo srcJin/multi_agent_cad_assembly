@@ -7,6 +7,8 @@ export interface WorkflowParams {
   pressureAngle?: number;
   bore?: number;
   shaftDiameter?: number;
+  wallThickness?: number;
+  clearance?: number;
 }
 
 export interface AgentContext {
