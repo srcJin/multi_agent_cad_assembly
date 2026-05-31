@@ -1,7 +1,12 @@
 import { useStore, type TabId } from "./lib/store";
 import { PromptPanel } from "./components/PromptPanel";
+import { StatusPanel } from "./components/StatusPanel";
 import { DrawingView } from "./tabs/DrawingView";
 import { SimulationView } from "./tabs/SimulationView";
+import { OrchestrationView } from "./tabs/OrchestrationView";
+import { TimelineView } from "./tabs/TimelineView";
+import { ValidationView } from "./tabs/ValidationView";
+import { StateExportView } from "./tabs/StateExportView";
 
 const TABS: TabId[] = ["drawing", "simulation", "orchestration", "timeline", "validation", "state"];
 
@@ -19,12 +24,15 @@ export default function App() {
             <>
               {activeTab === "drawing" && <DrawingView />}
               {activeTab === "simulation" && <SimulationView />}
-              {!["drawing", "simulation"].includes(activeTab) && <div data-testid="active-tab">{activeTab} view</div>}
+              {activeTab === "orchestration" && <OrchestrationView />}
+              {activeTab === "timeline" && <TimelineView />}
+              {activeTab === "validation" && <ValidationView />}
+              {activeTab === "state" && <StateExportView />}
             </>
           ) : <p>Run a workflow to begin.</p>}
         </section>
       </main>
-      <aside style={{ borderLeft: "1px solid #ddd", padding: 12 }}><p>Status panel</p></aside>
+      <aside style={{ borderLeft: "1px solid #ddd", padding: 12 }}><StatusPanel /></aside>
     </div>
   );
 }
